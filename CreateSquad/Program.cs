@@ -67,12 +67,14 @@ namespace CreateSquad
             using (var surface = SKSurface.Create(new SKImageInfo(w, h)))
             {
                 var canvas = surface.Canvas;
+
                 DrawComplexBroadcastBackground(canvas, w, h, theme);
                 DrawProfessionalHeader(canvas, w, h, showLogos, theme);
 
                 float pad = w * 0.015f;
-                float startY = h * 0.18f;
+                float startY = h * 0.115f;   
                 float gridH = h * 0.80f;
+
                 float cardW = (w - (pad * (cols + 1))) / cols;
                 float cardH = (gridH - (pad * (rows + 1))) / rows;
 
@@ -80,6 +82,7 @@ namespace CreateSquad
                 {
                     float x = pad + ((i % cols) * (cardW + pad));
                     float y = startY + ((i / cols) * (cardH + pad));
+
                     DrawGlassPlayerCard(canvas, players[i], x, y, cardW, cardH, theme);
                 }
 
@@ -223,27 +226,67 @@ namespace CreateSquad
 
         static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showLogos, Theme t)
         {
-            float margin = w * 0.03f; float headerBaseY = h * 0.06f; float centerX = w / 2;
+            float margin = w * 0.03f;
+            float headerBaseY = h * 0.06f;
+            float centerX = w / 2;
+
             if (showLogos)
             {
-                float logoW = w * 0.15f; float logoH = h * 0.07f;
+                float logoW = w * 0.15f;
+                float logoH = h * 0.07f;
+
                 SKRect left = DrawProportionalLogo(canvas, LogoCrickhunt, margin, headerBaseY - (logoH / 2), logoW, logoH, true);
                 SKRect right = DrawProportionalLogo(canvas, LogoTournament, w - margin, headerBaseY - (logoH / 2), logoW, logoH, false);
+
                 centerX = left.Right + (right.Left - left.Right) / 2;
             }
-            using (var paint = new SKPaint { Color = SKColors.White, IsAntialias = true, TextAlign = SKTextAlign.Center, FakeBoldText = true })
-            {
-                paint.TextSize = h * 0.042f; canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.012f), paint);
-                paint.FakeBoldText = false; paint.TextSize = h * 0.017f; paint.Color = SKColors.Silver;
-                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4", centerX, headerBaseY + (h * 0.038f), paint);
-            }
-            float divY = headerBaseY + (h * 0.075f);
-            using (var glassP = new SKPaint { Color = new SKColor(255, 255, 255, 30), IsAntialias = true })
-                canvas.DrawRect(new SKRect(margin, divY, w - margin, divY + (h * 0.005f)), glassP);
-            using (var glowP = new SKPaint { Color = t.Accent.WithAlpha(180), StrokeWidth = 2, IsAntialias = true })
-                canvas.DrawLine(margin, divY, w - margin, divY, glowP);
-        }
 
+            using (var paint = new SKPaint { IsAntialias = true, TextAlign = SKTextAlign.Center })
+            {
+                // MAIN TITLE
+                paint.Color = SKColors.White;
+                paint.TextSize = h * 0.042f;
+                paint.FakeBoldText = true;
+                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.012f), paint);
+
+                // SUB TITLE
+                paint.Color = SKColors.Silver;
+                paint.TextSize = h * 0.017f;
+                paint.FakeBoldText = false;
+                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4",
+                    centerX,
+                    headerBaseY + (h * 0.032f),
+                    paint);
+            }
+
+            // DIVIDER POSITION (balanced spacing)
+            float divY = headerBaseY + (h * 0.045f);
+            float divHeight = h * 0.0025f;
+
+            using (var glassP = new SKPaint
+            {
+                Color = new SKColor(255, 255, 255, 30),
+                IsAntialias = true
+            })
+            {
+                canvas.DrawRect(new SKRect(margin, divY, w - margin, divY + divHeight), glassP);
+            }
+
+            using (var glowP = new SKPaint
+            {
+                Color = t.Accent.WithAlpha(180),
+                StrokeWidth = 2,
+                IsAntialias = true
+            })
+            {
+                canvas.DrawLine(
+                    margin,
+                    divY + (divHeight / 2),
+                    w - margin,
+                    divY + (divHeight / 2),
+                    glowP);
+            }
+        }
         static SKRect DrawProportionalLogo(SKCanvas canvas, string path, float x, float y, float maxW, float maxH, bool left)
         {
             if (!File.Exists(path)) return new SKRect(x, y, x, y);
