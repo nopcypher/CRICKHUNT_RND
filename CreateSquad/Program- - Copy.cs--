@@ -1,0 +1,147 @@
+﻿using System;
+using System.Collections.Generic;
+using System.IO;
+using SkiaSharp;
+
+namespace CreateSquad
+{
+    public class Player
+    {
+        public string Name { get; set; }
+        public string Role { get; set; }
+        public string Points { get; set; }
+        public string Location { get; set; }
+        public string Badge { get; set; }
+        public string ImagePath { get; set; }
+    }
+
+    class Program1
+    {
+        static void Main(string[] args)
+        {
+            // 1. Setup Data
+            var players = GetMockData();
+
+            // 2. Setup Folder with Timestamp
+            string folderName = "GeneratedRosters";
+            if (!Directory.Exists(folderName)) Directory.CreateDirectory(folderName);
+
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+            // 3. Generate both versions
+            Console.WriteLine("Generating images...");
+
+            SaveRoster(players, folderName, "Landscape", 1920, 1440, 3, 5, timestamp);
+            SaveRoster(players, folderName, "Portrait", 1080, 1920, 2, 8, timestamp);
+
+            Console.WriteLine("\nDone! Images are in the '{0}' folder.", folderName);
+            Console.ReadLine();
+        }
+
+        static void SaveRoster(List<Player> players, string folder, string type, int width, int height, int cols, int rows, string ts)
+        {
+            string fileName = string.Format("{0}_{1}_{2}.png", type, ts, Guid.NewGuid().ToString().Substring(0, 4));
+            string fullPath = Path.Combine(folder, fileName);
+
+            using (var surface = SKSurface.Create(new SKImageInfo(width, height)))
+            {
+                var canvas = surface.Canvas;
+                DrawLayout(canvas, players, width, height, cols, rows);
+
+                using (var image = surface.Snapshot())
+                using (var data = image.Encode(SKEncodedImageFormat.Png, 100))
+                {
+                    File.WriteAllBytes(fullPath, data.ToArray());
+                }
+            }
+            Console.WriteLine("Saved: " + fileName);
+        }
+
+        static void DrawLayout(SKCanvas canvas, List<Player> players, int w, int h, int cols, int rows)
+        {
+            // Background
+            using (var paint = new SKPaint())
+            {
+                paint.Shader = SKShader.CreateLinearGradient(
+                    new SKPoint(0, 0), new SKPoint(0, h),
+                    new[] { new SKColor(45, 5, 5), new SKColor(15, 15, 15) },
+                    null, SKShaderTileMode.Clamp);
+                canvas.DrawRect(0, 0, w, h, paint);
+            }
+
+            // Header
+            using (var paint = new SKPaint { Color = SKColors.White, TextSize = h * 0.05f, IsAntialias = true, FakeBoldText = true, TextAlign = SKTextAlign.Center })
+            {
+                canvas.DrawText("RISING STAR MEDHA", w / 2, h * 0.07f, paint);
+            }
+
+            float padding = w * 0.02f;
+            float startY = h * 0.12f;
+            float cardW = (w - (padding * (cols + 1))) / cols;
+            float cardH = (h - startY - (padding * (rows + 1))) / rows;
+
+            for (int i = 0; i < players.Count && i < (cols * rows); i++)
+            {
+                int col = i % cols;
+                int row = i / cols;
+                float x = padding + (col * (cardW + padding));
+                float y = startY + (row * (cardH + padding));
+
+                DrawCard(canvas, players[i], x, y, cardW, cardH);
+            }
+        }
+
+        static void DrawCard(SKCanvas canvas, Player p, float x, float y, float w, float h)
+        {
+            var rect = new SKRect(x, y, x + w, y + h);
+            using (var bg = new SKPaint { Color = new SKColor(30, 30, 30), IsAntialias = true })
+            {
+                canvas.DrawRoundRect(rect, 10, 10, bg);
+            }
+
+            // Image Placeholder/Actual
+            var imgRect = new SKRect(x + 5, y + 5, x + (w * 0.4f), y + h - 5);
+            if (!string.IsNullOrEmpty(p.ImagePath) && File.Exists(p.ImagePath))
+            {
+                using (var stream = new SKFileStream(p.ImagePath))
+                using (var bitmap = SKBitmap.Decode(stream))
+                {
+                    canvas.DrawBitmap(bitmap, imgRect);
+                }
+            }
+            else
+            {
+                using (var pnt = new SKPaint { Color = SKColors.DimGray }) canvas.DrawRect(imgRect, pnt);
+            }
+
+            // Text
+            float tx = x + (w * 0.43f);
+            using (var tp = new SKPaint { Color = SKColors.White, IsAntialias = true, TextSize = h * 0.15f })
+            {
+                canvas.DrawText(p.Name, tx, y + (h * 0.25f), tp);
+                tp.Color = SKColors.YellowGreen;
+                tp.TextSize = h * 0.12f;
+                canvas.DrawText(p.Points, tx, y + (h * 0.45f), tp);
+                tp.Color = SKColors.Silver;
+                canvas.DrawText(p.Role, tx, y + (h * 0.65f), tp);
+            }
+
+            // Badge
+            if (!string.IsNullOrEmpty(p.Badge))
+            {
+                var br = new SKRect(x + 5, y + h - (h * 0.25f), x + (w * 0.4f), y + h - 5);
+                using (var bp = new SKPaint { Color = SKColors.DarkRed }) canvas.DrawRect(br, bp);
+                using (var tp = new SKPaint { Color = SKColors.White, TextSize = h * 0.12f, TextAlign = SKTextAlign.Center })
+                    canvas.DrawText(p.Badge, br.MidX, br.MidY + (h * 0.05f), tp);
+            }
+        }
+
+        static List<Player> GetMockData()
+        {
+            var list = new List<Player>();
+            for (int i = 1; i <= 15; i++)
+                list.Add(new Player { Name = "Player " + i, Role = "All-Rounder", Points = i + " LAKH", Location = "Bhavnagar", Badge = i == 1 ? "OWNER" : "" });
+            return list;
+        }
+    }
+}
