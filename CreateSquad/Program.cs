@@ -58,7 +58,9 @@ namespace CreateSquad
         static void GenerateForTheme(List<Player> players, Theme t, string ts)
         {
             string safeName = t.Name.Replace(" ", "_").Replace("/", "-");
-            GenerateImage(players, 1080, 1920, 2, 7, Path.Combine(OutputFolder, safeName + "_Portrait_" + ts + ".png"), false, t);
+
+            // Width: 1080, Height: 1920, Columns: 2, ROWS: 10 <--- THIS MUST BE 10
+            GenerateImage(players, 1080, 1920, 2, 10, Path.Combine(OutputFolder, safeName + "_Portrait_" + ts + ".png"), false, t);
             GenerateImage(players, 1500, 1500, 3, 5, Path.Combine(OutputFolder, safeName + "_Square_" + ts + ".png"), true, t);
         }
 
@@ -67,22 +69,22 @@ namespace CreateSquad
             using (var surface = SKSurface.Create(new SKImageInfo(w, h)))
             {
                 var canvas = surface.Canvas;
-
                 DrawComplexBroadcastBackground(canvas, w, h, theme);
                 DrawProfessionalHeader(canvas, w, h, showLogos, theme);
 
-                float pad = w * 0.015f;
-                float startY = h * 0.115f;   
-                float gridH = h * 0.80f;
+                // --- EXTREME SETTINGS FOR 20 PLAYERS ---
+                float pad = w * 0.01f;           // Ultra tight padding
+                float startY = h * 0.085f;       // Start higher up
+                float gridH = h * 0.90f;         // Use 90% of the screen height
 
                 float cardW = (w - (pad * (cols + 1))) / cols;
                 float cardH = (gridH - (pad * (rows + 1))) / rows;
 
+                // This loop goes up to 20 (cols * rows)
                 for (int i = 0; i < players.Count && i < (cols * rows); i++)
                 {
                     float x = pad + ((i % cols) * (cardW + pad));
                     float y = startY + ((i / cols) * (cardH + pad));
-
                     DrawGlassPlayerCard(canvas, players[i], x, y, cardW, cardH, theme);
                 }
 
@@ -184,50 +186,58 @@ namespace CreateSquad
         static void DrawGlassPlayerCard(SKCanvas canvas, Player p, float x, float y, float w, float h, Theme t)
         {
             var rect = new SKRect(x, y, x + w, y + h);
-            using (var bg = new SKPaint { Color = new SKColor(255, 255, 255, 35), IsAntialias = true })
-                canvas.DrawRoundRect(rect, 20, 20, bg);
-            using (var border = new SKPaint { Color = t.Secondary.WithAlpha(80), Style = SKPaintStyle.Stroke, StrokeWidth = 2, IsAntialias = true })
-                canvas.DrawRoundRect(rect, 20, 20, border);
+            using (var bg = new SKPaint { Color = new SKColor(255, 255, 255, 25), IsAntialias = true })
+                canvas.DrawRoundRect(rect, 10, 10, bg);
 
-            float bW = w * 0.22f; float bH = h * 0.16f;
-            var bRect = new SKRect(x + w - bW - 10, y + 10, x + w - 10, y + 10 + bH);
+            float imgSize = h * 0.82f;
+            float imgCx = x + (w * 0.05f) + (imgSize / 2);
+            float imgCy = y + (h / 2);
+            DrawCircularImage(canvas, p.PictureUrl, imgCx, imgCy, imgSize);
+
+            // 1. AUCTION NUMBER BADGE
+            float badgeRadius = imgSize * 0.20f;
+            float badgeX = imgCx + (imgSize * 0.44f);
+            float badgeY = imgCy - (imgSize * 0.35f);
             using (var bP = new SKPaint { Color = t.Secondary, IsAntialias = true })
             {
-                canvas.DrawRoundRect(bRect, 8, 8, bP);
-                using (var tP = new SKPaint { Color = SKColors.White, TextSize = bH * 0.7f, TextAlign = SKTextAlign.Center, FakeBoldText = true })
-                    canvas.DrawText("#" + p.AuctionNumber, bRect.MidX, bRect.MidY + (bH * 0.25f), tP);
+                canvas.DrawCircle(badgeX, badgeY, badgeRadius, bP);
+                using (var tP = new SKPaint { Color = SKColors.White, TextSize = badgeRadius * 1.1f, TextAlign = SKTextAlign.Center, FakeBoldText = true, IsAntialias = true })
+                    canvas.DrawText(p.AuctionNumber, badgeX, badgeY + (badgeRadius * 0.38f), tP);
             }
 
-            DrawCircularImage(canvas, p.PictureUrl, x + (w * 0.05f) + (h * 0.375f), y + (h / 2), h * 0.75f);
-
-            float textX = x + (w * 0.05f) + (h * 0.75f) + (w * 0.04f);
-            float maxTextW = (x + w) - textX - (w * 0.06f);
-
+            // 2. TEXT RENDERING
             using (var tp = new SKPaint { Color = SKColors.White, IsAntialias = true, FakeBoldText = true })
             {
+                float textX = x + (w * 0.12f) + imgSize;
+                float maxW = (x + w) - textX - (w * 0.05f);
+
+                // NAME (Positioned at 30% of card height)
+                tp.TextSize = h * 0.22f;
+                string[] nameLines = SplitNameStrict(p.Name, maxW, tp);
+                canvas.DrawText(nameLines[0], textX, y + (h * 0.30f), tp);
+
+                // SKILL 1 (Positioned closely under name at 50%)
                 tp.TextSize = h * 0.13f;
-                string[] words = SplitNameStrict(p.Name, maxTextW, tp);
+                tp.FakeBoldText = false;
+                tp.Color = SKColors.Silver;
+                canvas.DrawText(p.Skill1, textX, y + (h * 0.50f), tp);
 
-                if (words.Length > 1)
-                {
-                    canvas.DrawText(words[0], textX, y + (h * 0.30f), tp);
-                    canvas.DrawText(words[1], textX, y + (h * 0.45f), tp);
-                }
-                else canvas.DrawText(p.Name, textX, y + (h * 0.40f), tp);
+                // SKILL 2 (New line at 65%)
+                canvas.DrawText(p.Skill2, textX, y + (h * 0.65f), tp);
 
-                tp.FakeBoldText = false; tp.TextSize = h * 0.10f; tp.Color = SKColors.Silver;
-                canvas.DrawText(p.Skill1, textX, y + (h * 0.60f), tp);
-                canvas.DrawText(p.Skill2, textX, y + (h * 0.72f), tp);
-
-                tp.Color = t.Accent; tp.TextSize = h * 0.11f; tp.FakeBoldText = true;
-                canvas.DrawText("PTS: " + p.Points + " | " + p.PlayerType, textX, y + (h * 0.88f), tp);
+                // PTS & RD (Bottom line at 88%)
+                tp.TextSize = h * 0.16f;
+                tp.FakeBoldText = true;
+                tp.Color = t.Accent;
+                string statsText = $"PTS: {p.Points} | RD: {p.PlayerType}";
+                canvas.DrawText(statsText, textX, y + (h * 0.88f), tp);
             }
         }
 
         static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showLogos, Theme t)
         {
             float margin = w * 0.03f;
-            float headerBaseY = h * 0.06f;
+            float headerBaseY = h * 0.045f; // reduced from 0.06f to tighten top spacing
             float centerX = w / 2;
 
             if (showLogos)
@@ -247,7 +257,7 @@ namespace CreateSquad
                 paint.Color = SKColors.White;
                 paint.TextSize = h * 0.042f;
                 paint.FakeBoldText = true;
-                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.012f), paint);
+                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.01f), paint); // reduced from 0.012f
 
                 // SUB TITLE
                 paint.Color = SKColors.Silver;
@@ -255,12 +265,12 @@ namespace CreateSquad
                 paint.FakeBoldText = false;
                 canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4",
                     centerX,
-                    headerBaseY + (h * 0.032f),
+                    headerBaseY + (h * 0.028f), // reduced from 0.032f
                     paint);
             }
 
             // DIVIDER POSITION (balanced spacing)
-            float divY = headerBaseY + (h * 0.045f);
+            float divY = headerBaseY + (h * 0.038f); // reduced from 0.045f
             float divHeight = h * 0.0025f;
 
             using (var glassP = new SKPaint
@@ -287,6 +297,7 @@ namespace CreateSquad
                     glowP);
             }
         }
+
         static SKRect DrawProportionalLogo(SKCanvas canvas, string path, float x, float y, float maxW, float maxH, bool left)
         {
             if (!File.Exists(path)) return new SKRect(x, y, x, y);
@@ -361,17 +372,18 @@ namespace CreateSquad
         static List<Player> GetMockData()
         {
             var list = new List<Player>();
-            for (int i = 1; i <= 14; i++)
+            // THIS MUST BE 20
+            for (int i = 1; i <= 20; i++)
             {
                 list.Add(new Player
                 {
-                    Name = i == 1 ? "PALADIYA RAJUBHAI BHAGVANBHAI PATEL" : "PLAYER NAME " + i,
+                    Name = i == 1 ? "PALADIYA RAJUBHAI BHAGVANBHAI PATEL" : "PLAYER " + i,
                     Points = (i * 10).ToString(),
                     PictureUrl = "https://crickhunt.com/images/thumbs/0039993_user_Pic_262663.png-4_300.webp",
-                    AuctionNumber = (1000 + i).ToString(),
-                    PlayerType = i < 3 ? "OWNER" : "ICON",
+                    AuctionNumber = i.ToString(),
+                    PlayerType = "PLAYER",
                     Skill1 = "Right-Hand Bat",
-                    Skill2 = "Wicket Keeper"
+                    Skill2 = "left-Hand Bat"
                 });
             }
             return list;
