@@ -59,66 +59,51 @@ namespace CreateSquad
         {
             string safeName = t.Name.Replace(" ", "_").Replace("/", "-");
 
-            int playerCount = players.Count;
+            // Portrait 1080x1920
+            GenerateImage(players, 1080, 1920, Path.Combine(OutputFolder, safeName + "_Portrait_" + ts + ".png"), true, false, t);
 
-            // PORTRAIT
-            int portraitCols = 2;
-            int portraitRows = (int)Math.Ceiling(playerCount / 2.0);
-
-            // SQUARE - stable layout
-            int squareCols;
-
-            if (playerCount >= 20)
-                squareCols = 4;
-            else if (playerCount >= 16)
-                squareCols = 4;
-            else if (playerCount >= 12)
-                squareCols = 3;
-            else
-                squareCols = 2;
-
-            int squareRows = (int)Math.Ceiling(playerCount / (float)squareCols);
-
-            GenerateImage(players, 1080, 1920, portraitCols, portraitRows,
-                Path.Combine(OutputFolder, safeName + "_Portrait_" + ts + ".png"), false, t);
-
-            GenerateImage(players, 1500, 1500, squareCols, squareRows,
-                Path.Combine(OutputFolder, safeName + "_Square_" + ts + ".png"), true, t);
+            // Square 1500x1500
+            GenerateImage(players, 1500, 1500, Path.Combine(OutputFolder, safeName + "_Square_" + ts + ".png"), true, true, t);
         }
 
-        static void GenerateImage(List<Player> players, int w, int h, int cols, int rows, string path, bool showLogos, Theme theme)
+        static void GenerateImage(List<Player> players, int w, int h, string path, bool showTeamLogo, bool showTournamentLogo, Theme theme)
         {
             using (var surface = SKSurface.Create(new SKImageInfo(w, h)))
             {
                 var canvas = surface.Canvas;
 
                 DrawComplexBroadcastBackground(canvas, w, h, theme);
-                DrawProfessionalHeader(canvas, w, h, showLogos, theme);
+                DrawProfessionalHeader(canvas, w, h, showTeamLogo, showTournamentLogo, theme);
 
-                int playerCount = players.Count;
+                float pad = w * 0.01f;
+                float startY = h * 0.085f;
+                float gridH = h * 0.90f;
 
-                // spacing
-                float sideMargin = w * 0.027f;
-                float pad = w * 0.012f;
+                int designSlots = 13; // small design style (like 7-13 player style)
+                bool useSmallDesign = players.Count <= 16; // use 13-player layout for <=16 players
+                int totalSlots = Math.Max(designSlots, players.Count); // enough slots for all players
 
-                float startY = h * 0.09f;
-                float footerSpace = h * 0.03f;
+                int cols, rows;
+                if (w < h) // Portrait
+                    cols = 2;
+                else
+                    cols = 3;
 
-                float gridW = w - (sideMargin * 2);
-                float gridH = h - startY - footerSpace;
+                rows = (int)Math.Ceiling((float)totalSlots / cols);
 
-                float cardW = (gridW - ((cols - 1) * pad)) / cols;
-                float cardH = (gridH - ((rows - 1) * pad)) / rows;
+                float cardW = (w - (pad * (cols + 1))) / cols;
+                float cardH = (gridH - (pad * (rows + 1))) / rows;
 
-                for (int i = 0; i < players.Count && i < (cols * rows); i++)
+                // Draw actual players
+                for (int i = 0; i < players.Count; i++)
                 {
                     int col = i % cols;
                     int row = i / cols;
+                    float x = pad + col * (cardW + pad);
+                    float y = startY + row * (cardH + pad);
 
-                    float x = sideMargin + (col * (cardW + pad));
-                    float y = startY + (row * (cardH + pad));
-
-                    DrawGlassPlayerCard(canvas, players[i], x, y, cardW, cardH, theme);
+                    float imageScale = useSmallDesign ? 0.60f : 0.75f; // smaller scale for small design
+                    DrawGlassPlayerCard(canvas, players[i], x, y, cardW, cardH, theme, imageScale);
                 }
 
                 DrawBrandedFooter(canvas, w, h);
@@ -216,134 +201,110 @@ namespace CreateSquad
             }
         }
 
-        static void DrawGlassPlayerCard(SKCanvas canvas, Player p, float x, float y, float w, float h, Theme t)
+        static void DrawGlassPlayerCard(SKCanvas canvas, Player p, float x, float y, float w, float h, Theme t, float imageScale = 0.75f)
         {
-            var rect = new SKRect(x, y, x + w, y + h);
+            float topPadding = h * 0.05f; // 5% of height as top spacing
 
-            using (var bg = new SKPaint { Color = new SKColor(255, 255, 255, 28), IsAntialias = true })
-                canvas.DrawRoundRect(rect, 12, 12, bg);
+            // Draw card background
+            var rect = new SKRect(x, y + topPadding, x + w, y + h);
+            using (var bg = new SKPaint { Color = new SKColor(255, 255, 255, 35), IsAntialias = true })
+                canvas.DrawRoundRect(rect, 20, 20, bg);
+            using (var border = new SKPaint { Color = t.Secondary.WithAlpha(80), Style = SKPaintStyle.Stroke, StrokeWidth = 2, IsAntialias = true })
+                canvas.DrawRoundRect(rect, 20, 20, border);
 
-            float padding = w * 0.04f;
+            // Draw player image with scale factor
+            float imageSize = h * imageScale;
+            float imageX = x + (w * 0.05f) + (imageSize / 2);
+            float imageY = y + topPadding + (h / 2);
+            DrawCircularImage(canvas, p.PictureUrl, imageX, imageY, imageSize);
 
-            bool isPortraitCard = h > w * 1.2f;
+            // AuctionNumber badge
+            float badgeSize = h * 0.20f;
+            float badgeX = imageX - (imageSize / 2) - (badgeSize * 0.2f);
+            float badgeY = imageY - (imageSize / 2) - (badgeSize * 0.25f);
 
-            float imgSize;
-            float imgCx;
-            float imgCy;
-
-            if (isPortraitCard)
+            var badgeCenter = new SKPoint(badgeX + badgeSize / 2, badgeY + badgeSize / 2);
+            using (var badgePaint = new SKPaint { Color = t.Secondary, IsAntialias = true })
             {
-                // PORTRAIT CARD
-                imgSize = h * 0.72f;
+                canvas.DrawCircle(badgeCenter, badgeSize / 2, badgePaint);
 
-                imgCx = x + (w * 0.05f) + (imgSize / 2);
-                imgCy = y + (h / 2);
-            }
-            else
-            {
-                // SQUARE GRID CARD
-                imgSize = h * 0.58f;
-
-                imgCx = x + (w * 0.06f) + (imgSize / 2);
-                imgCy = y + (h / 2);
-            }
-
-            DrawCircularImage(canvas, p.PictureUrl, imgCx, imgCy, imgSize);
-
-            // BADGE
-            float badgeRadius = imgSize * 0.18f;
-            float badgeX = imgCx + (imgSize * 0.42f);
-            float badgeY = imgCy - (imgSize * 0.38f);
-
-            using (var bp = new SKPaint { Color = t.Secondary, IsAntialias = true })
-            {
-                canvas.DrawCircle(badgeX, badgeY, badgeRadius, bp);
-
-                using (var tp = new SKPaint
+                using (var textPaint = new SKPaint
                 {
                     Color = SKColors.White,
-                    TextSize = badgeRadius * 1.1f,
-                    FakeBoldText = true,
+                    TextSize = badgeSize * 0.6f,
                     TextAlign = SKTextAlign.Center,
+                    FakeBoldText = true,
                     IsAntialias = true
                 })
-                    canvas.DrawText(p.AuctionNumber, badgeX, badgeY + badgeRadius * 0.35f, tp);
+                {
+                    var fm = textPaint.FontMetrics;
+                    float textY = badgeCenter.Y - ((fm.Ascent + fm.Descent) / 2);
+                    canvas.DrawText(p.AuctionNumber, badgeCenter.X, textY, textPaint);
+                }
             }
 
-            float textX = imgCx + (imgSize / 2) + padding;
-            float textWidth = (x + w) - textX - padding;
+            // Text position
+            float textX = x + (w * 0.05f) + imageSize + (w * 0.04f);
+            float maxTextW = (x + w) - textX - (w * 0.06f);
+            float textOffset = h * 0.07f; // move content upward
 
-            using (var tp = new SKPaint { IsAntialias = true })
+            using (var tp = new SKPaint { Color = SKColors.White, IsAntialias = true, FakeBoldText = true })
             {
-                // NAME
-                tp.Color = SKColors.White;
-                tp.TextSize = w * (isPortraitCard ? 0.09f : 0.08f);
-                tp.FakeBoldText = true;
+                tp.TextSize = h * 0.13f;
+                string[] words = SplitNameStrict(p.Name, maxTextW, tp);
 
-                string[] nameLines = SplitNameStrict(p.Name, textWidth, tp);
+                if (words.Length > 1)
+                {
+                    canvas.DrawText(words[0], textX, y + topPadding + (h * 0.30f) - textOffset, tp);
+                    canvas.DrawText(words[1], textX, y + topPadding + (h * 0.45f) - textOffset, tp);
+                }
+                else
+                    canvas.DrawText(p.Name, textX, y + topPadding + (h * 0.40f) - textOffset, tp);
 
-                float nameY = y + (h * 0.32f);
-
-                canvas.DrawText(nameLines[0], textX, nameY, tp);
-
-                if (nameLines.Length > 1)
-                    canvas.DrawText(nameLines[1], textX, nameY + (h * 0.12f), tp);
-
-                // SKILLS
-                tp.Color = SKColors.Silver;
-                tp.TextSize = w * (isPortraitCard ? 0.065f : 0.055f);
                 tp.FakeBoldText = false;
+                tp.TextSize = h * 0.10f;
+                tp.Color = SKColors.Silver;
+                canvas.DrawText(p.Skill1, textX, y + topPadding + (h * 0.60f) - textOffset, tp);
+                canvas.DrawText(p.Skill2, textX, y + topPadding + (h * 0.72f) - textOffset, tp);
 
-                canvas.DrawText(p.Skill1, textX, y + (h * 0.58f), tp);
-                canvas.DrawText(p.Skill2, textX, y + (h * 0.72f), tp);
-
-                // STATS
                 tp.Color = t.Accent;
-                tp.TextSize = w * (isPortraitCard ? 0.060f : 0.050f);
+                tp.TextSize = h * 0.11f;
                 tp.FakeBoldText = true;
-
-                string stats = $"PTS: {p.Points} | RD: {p.PlayerType}";
-                canvas.DrawText(stats, textX, y + (h * 0.88f), tp);
+                canvas.DrawText("PTS: " + p.Points + " | " + p.PlayerType, textX, y + topPadding + (h * 0.88f) - textOffset, tp);
             }
         }
 
-        static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showLogos, Theme t)
+        static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showTeamLogo, bool showTournamentLogo, Theme t)
         {
             float margin = w * 0.03f;
-            float headerBaseY = h * 0.045f; // reduced from 0.06f to tighten top spacing
+            float headerBaseY = h * 0.045f;
             float centerX = w / 2;
 
-            if (showLogos)
-            {
-                float logoW = w * 0.15f;
-                float logoH = h * 0.07f;
+            float logoW = w * 0.15f;
+            float logoH = h * 0.07f;
 
-                SKRect left = DrawProportionalLogo(canvas, LogoCrickhunt, margin, headerBaseY - (logoH / 2), logoW, logoH, true);
-                SKRect right = DrawProportionalLogo(canvas, LogoTournament, w - margin, headerBaseY - (logoH / 2), logoW, logoH, false);
-
-                centerX = left.Right + (right.Left - left.Right) / 2;
-            }
+            SKRect left = DrawProportionalLogo(canvas, LogoCrickhunt, margin, headerBaseY - (logoH / 2), logoW, logoH, true, showTeamLogo);
+            SKRect right = DrawProportionalLogo(canvas, LogoTournament, w - margin, headerBaseY - (logoH / 2), logoW, logoH, false, showTournamentLogo);
+            
+            centerX = left.Right + (right.Left - left.Right) / 2;
 
             using (var paint = new SKPaint { IsAntialias = true, TextAlign = SKTextAlign.Center })
             {
                 // MAIN TITLE
                 paint.Color = SKColors.White;
-                paint.TextSize = h * 0.042f;
+                paint.TextSize = h * 0.035f;
                 paint.FakeBoldText = true;
-                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.01f), paint); // reduced from 0.012f
+                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.01f), paint);
 
                 // SUB TITLE
                 paint.Color = SKColors.Silver;
                 paint.TextSize = h * 0.017f;
                 paint.FakeBoldText = false;
-                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4",
-                    centerX,
-                    headerBaseY + (h * 0.028f), // reduced from 0.032f
-                    paint);
+                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4", centerX, headerBaseY + (h * 0.028f), paint);
             }
 
             // DIVIDER POSITION (balanced spacing)
-            float divY = headerBaseY + (h * 0.038f); // reduced from 0.045f
+            float divY = headerBaseY + (h * 0.038f);
             float divHeight = h * 0.0025f;
 
             using (var glassP = new SKPaint
@@ -371,14 +332,21 @@ namespace CreateSquad
             }
         }
 
-        static SKRect DrawProportionalLogo(SKCanvas canvas, string path, float x, float y, float maxW, float maxH, bool left)
+        static SKRect DrawProportionalLogo(SKCanvas canvas, string path, float x, float y, float maxW, float maxH, bool isLeftLogo, bool showLogo)
         {
-            if (!File.Exists(path)) return new SKRect(x, y, x, y);
+            if (!showLogo || !File.Exists(path))
+                return new SKRect(x, y, x, y);
+
             using (var b = SKBitmap.Decode(path))
             {
                 float sc = Math.Min(maxW / b.Width, maxH / b.Height);
-                float sw = b.Width * sc, sh = b.Height * sc;
-                float fx = left ? x : x - sw; float fy = y + (maxH - sh) / 2;
+                float sw = b.Width * sc;
+                float sh = b.Height * sc;
+
+                // Align left or right
+                float fx = isLeftLogo ? x : x - sw;
+                float fy = y + (maxH - sh) / 2;
+
                 SKRect dest = new SKRect(fx, fy, fx + sw, fy + sh);
                 canvas.DrawBitmap(b, dest, new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.High });
                 return dest;
@@ -406,13 +374,27 @@ namespace CreateSquad
 
         static string[] SplitNameStrict(string name, float maxWidth, SKPaint paint)
         {
-            if (paint.MeasureText(name) <= maxWidth) return new string[] { name };
+            // Set default smaller text size
+            paint.TextSize = 25f;
+
+            // If name fits, return one line
+            if (paint.MeasureText(name) <= maxWidth)
+                return new string[] { name };
+
+            // Split into words
             string[] words = name.Split(' ');
             if (words.Length < 2) return new string[] { name };
+
             int mid = words.Length / 2;
-            string l1 = string.Join(" ", words, 0, mid); string l2 = string.Join(" ", words, mid, words.Length - mid);
-            while ((paint.MeasureText(l1) > maxWidth || paint.MeasureText(l2) > maxWidth) && paint.TextSize > 8)
-                paint.TextSize -= 0.3f;
+            string l1 = string.Join(" ", words, 0, mid);
+            string l2 = string.Join(" ", words, mid, words.Length - mid);
+
+            // Reduce slightly if still too wide
+            while ((paint.MeasureText(l1) > maxWidth || paint.MeasureText(l2) > maxWidth) && paint.TextSize > 6f)
+            {
+                paint.TextSize -= 0.5f;
+            }
+
             return new string[] { l1, l2 };
         }
 
@@ -445,18 +427,17 @@ namespace CreateSquad
         static List<Player> GetMockData()
         {
             var list = new List<Player>();
-            // THIS MUST BE 20
-            for (int i = 1; i <= 15; i++)
+            for (int i = 1; i <= 20; i++)
             {
                 list.Add(new Player
                 {
-                    Name = i == 1 ? "PALADIYA RAJUBHAI BHAGVANBHAI PATEL" : "PLAYER " + i,
+                    Name = i == 1 ? "PALADIYA RAJUBHAI BHAGVANBHAI PATEL" : "PLAYER NAME " + i,
                     Points = (i * 10).ToString(),
                     PictureUrl = "https://crickhunt.com/images/thumbs/0039993_user_Pic_262663.png-4_300.webp",
                     AuctionNumber = i.ToString(),
-                    PlayerType = "PLAYER",
+                    PlayerType = i < 3 ? "OWNER" : "ICON",
                     Skill1 = "Right-Hand Bat",
-                    Skill2 = "left-Hand Bat"
+                    Skill2 = "Wicket Keeper"
                 });
             }
             return list;
