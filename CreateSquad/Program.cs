@@ -1,8 +1,8 @@
-﻿using System;
+﻿using SkiaSharp;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
-using SkiaSharp;
 
 namespace CreateSquad
 {
@@ -53,6 +53,20 @@ namespace CreateSquad
 
             Console.WriteLine("\nSuccess! Pro files saved in: " + OutputFolder);
             Console.ReadLine();
+        }
+
+        static SKColor GetSkillColor(Theme t)
+        {
+            switch (t.Name)
+            {
+                case "Bangalore Red":
+                    return SKColors.LightGray;
+                case "Chennai Gold":
+                    return new SKColor(240, 240, 240);
+
+                default:
+                    return new SKColor(210, 210, 210);
+            }
         }
 
         static void GenerateForTheme(List<Player> players, Theme t, string ts)
@@ -156,6 +170,173 @@ namespace CreateSquad
             }
         }
 
+        static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showTeamLogo, bool showTournamentLogo, Theme t)
+        {
+            float margin = w * 0.03f;
+            float headerBaseY = h * 0.045f;
+            float centerX = w / 2;
+
+            float logoW = w * 0.15f;
+            float logoH = h * 0.07f;
+
+            SKRect left = DrawProportionalLogo(canvas, LogoCrickhunt, margin, headerBaseY - (logoH / 2), logoW, logoH, true, showTeamLogo);
+            SKRect right = DrawProportionalLogo(canvas, LogoTournament, w - margin, headerBaseY - (logoH / 2), logoW, logoH, false, showTournamentLogo);
+
+            centerX = left.Right + (right.Left - left.Right) / 2;
+
+            using (var paint = new SKPaint { IsAntialias = true, TextAlign = SKTextAlign.Center })
+            {
+                // MAIN TITLE
+                paint.Color = SKColors.White;
+                paint.TextSize = h * 0.035f;
+                paint.FakeBoldText = true;
+                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.01f), paint);
+
+                // SUB TITLE
+                paint.TextSize = h * 0.017f;
+                paint.FakeBoldText = false;
+
+                // Slightly brighter silver (natural look)
+                paint.Color = SKColors.Silver;
+
+                switch (t.Name)
+                {
+                    case "Bangalore Red":
+                        paint.Color = SKColors.LightGray;
+                        break;
+                    case "Chennai Gold":
+                        paint.Color = SKColors.Gray;
+                        break;
+                    case "Hyderabad Orange":
+                        paint.Color = new SKColor(60, 60, 60);
+                        break;
+                }
+                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4", centerX, headerBaseY + (h * 0.028f), paint);
+            }
+
+            // DIVIDER POSITION (balanced spacing)
+            float divY = headerBaseY + (h * 0.038f);
+            float divHeight = h * 0.0025f;
+
+            using (var glassP = new SKPaint
+            {
+                Color = new SKColor(255, 255, 255, 30),
+                IsAntialias = true
+            })
+            {
+                canvas.DrawRect(new SKRect(margin, divY, w - margin, divY + divHeight), glassP);
+            }
+
+            using (var glowP = new SKPaint
+            {
+                Color = t.Accent.WithAlpha(180),
+                StrokeWidth = 2,
+                IsAntialias = true
+            })
+            {
+                canvas.DrawLine(
+                    margin,
+                    divY + (divHeight / 2),
+                    w - margin,
+                    divY + (divHeight / 2),
+                    glowP);
+            }
+        }
+
+        static void DrawGlassPlayerCard(SKCanvas canvas, Player p, float x, float y, float w, float h, Theme t, float imageScale = 0.75f)
+        {
+            float topPadding = h * 0.05f; // 5% of height as top spacing
+
+            // Draw card background
+            var rect = new SKRect(x, y + topPadding, x + w, y + h);
+            using (var bg = new SKPaint { Color = new SKColor(255, 255, 255, 35), IsAntialias = true })
+                canvas.DrawRoundRect(rect, 20, 20, bg);
+            using (var border = new SKPaint { Color = t.Secondary.WithAlpha(80), Style = SKPaintStyle.Stroke, StrokeWidth = 2, IsAntialias = true })
+                canvas.DrawRoundRect(rect, 20, 20, border);
+
+            // Draw player image with scale factor
+            float imageSize = h * imageScale;
+            float imageX = x + (w * 0.05f) + (imageSize / 2);
+            float imageY = y + topPadding + (h / 2);
+            DrawCircularImage(canvas, p.PictureUrl, imageX, imageY, imageSize);
+
+            // AuctionNumber badge
+            float badgeSize = h * 0.20f;
+            float badgeX = imageX - (imageSize / 2) - (badgeSize * 0.2f);
+            float badgeY = imageY - (imageSize / 2) - (badgeSize * 0.25f);
+
+            var badgeCenter = new SKPoint(badgeX + badgeSize / 2, badgeY + badgeSize / 2);
+            SKColor badgeColor = t.Secondary;
+
+            switch (t.Name)
+            {
+                case "Bangalore Red":
+                    badgeColor = new SKColor(80, 80, 80);
+                    break;
+                case "Crimson Silver":
+                    badgeColor = new SKColor(130, 130, 130);
+                    break;
+                case "Forest Green":
+                    badgeColor = new SKColor(70, 170, 70);
+                    break;
+                case "Hyderabad Orange":
+                    badgeColor = new SKColor(115, 115, 115);
+                    break;
+                case "Electric Blue":
+                    badgeColor = new SKColor(20, 40, 140);
+                    break;
+            }
+
+            using (var badgePaint = new SKPaint { Color = badgeColor, IsAntialias = true })
+            {
+                canvas.DrawCircle(badgeCenter, badgeSize / 2, badgePaint);
+
+                using (var textPaint = new SKPaint
+                {
+                    Color = SKColors.White,
+                    TextSize = badgeSize * 0.6f,
+                    TextAlign = SKTextAlign.Center,
+                    FakeBoldText = true,
+                    IsAntialias = true
+                })
+                {
+                    var fm = textPaint.FontMetrics;
+                    float textY = badgeCenter.Y - ((fm.Ascent + fm.Descent) / 2);
+                    canvas.DrawText(p.AuctionNumber, badgeCenter.X, textY, textPaint);
+                }
+            }
+
+            // Text position
+            float textX = x + (w * 0.05f) + imageSize + (w * 0.04f);
+            float maxTextW = (x + w) - textX - (w * 0.06f);
+            float textOffset = h * 0.07f; // move content upward
+
+            using (var tp = new SKPaint { Color = SKColors.White, IsAntialias = true, FakeBoldText = true })
+            {
+                tp.TextSize = h * 0.13f;
+                string[] words = SplitNameStrict(p.Name, maxTextW, tp);
+
+                if (words.Length > 1)
+                {
+                    canvas.DrawText(words[0], textX, y + topPadding + (h * 0.30f) - textOffset, tp);
+                    canvas.DrawText(words[1], textX, y + topPadding + (h * 0.45f) - textOffset, tp);
+                }
+                else
+                    canvas.DrawText(p.Name, textX, y + topPadding + (h * 0.40f) - textOffset, tp);
+
+                tp.FakeBoldText = false;
+                tp.TextSize = h * 0.10f;
+                tp.Color = GetSkillColor(t);
+                canvas.DrawText(p.Skill1, textX, y + topPadding + (h * 0.60f) - textOffset, tp);
+                canvas.DrawText(p.Skill2, textX, y + topPadding + (h * 0.72f) - textOffset, tp);
+
+                tp.Color = t.Accent;
+                tp.TextSize = h * 0.11f;
+                tp.FakeBoldText = true;
+                canvas.DrawText("PTS: " + p.Points + " | " + p.PlayerType, textX, y + topPadding + (h * 0.88f) - textOffset, tp);
+            }
+        }
+
         static void DrawBrandedFooter(SKCanvas canvas, int w, int h)
         {
             string p1 = "Made with ";
@@ -198,137 +379,6 @@ namespace CreateSquad
                         canvas.DrawBitmap(b, new SKRect(startX + w1 + hWidth + w2 + (w * 0.01f), footerY - (logoH * 0.8f), startX + w1 + hWidth + w2 + (w * 0.01f) + sw, footerY + (logoH * 0.2f)));
                     }
                 }
-            }
-        }
-
-        static void DrawGlassPlayerCard(SKCanvas canvas, Player p, float x, float y, float w, float h, Theme t, float imageScale = 0.75f)
-        {
-            float topPadding = h * 0.05f; // 5% of height as top spacing
-
-            // Draw card background
-            var rect = new SKRect(x, y + topPadding, x + w, y + h);
-            using (var bg = new SKPaint { Color = new SKColor(255, 255, 255, 35), IsAntialias = true })
-                canvas.DrawRoundRect(rect, 20, 20, bg);
-            using (var border = new SKPaint { Color = t.Secondary.WithAlpha(80), Style = SKPaintStyle.Stroke, StrokeWidth = 2, IsAntialias = true })
-                canvas.DrawRoundRect(rect, 20, 20, border);
-
-            // Draw player image with scale factor
-            float imageSize = h * imageScale;
-            float imageX = x + (w * 0.05f) + (imageSize / 2);
-            float imageY = y + topPadding + (h / 2);
-            DrawCircularImage(canvas, p.PictureUrl, imageX, imageY, imageSize);
-
-            // AuctionNumber badge
-            float badgeSize = h * 0.20f;
-            float badgeX = imageX - (imageSize / 2) - (badgeSize * 0.2f);
-            float badgeY = imageY - (imageSize / 2) - (badgeSize * 0.25f);
-
-            var badgeCenter = new SKPoint(badgeX + badgeSize / 2, badgeY + badgeSize / 2);
-            using (var badgePaint = new SKPaint { Color = t.Secondary, IsAntialias = true })
-            {
-                canvas.DrawCircle(badgeCenter, badgeSize / 2, badgePaint);
-
-                using (var textPaint = new SKPaint
-                {
-                    Color = SKColors.White,
-                    TextSize = badgeSize * 0.6f,
-                    TextAlign = SKTextAlign.Center,
-                    FakeBoldText = true,
-                    IsAntialias = true
-                })
-                {
-                    var fm = textPaint.FontMetrics;
-                    float textY = badgeCenter.Y - ((fm.Ascent + fm.Descent) / 2);
-                    canvas.DrawText(p.AuctionNumber, badgeCenter.X, textY, textPaint);
-                }
-            }
-
-            // Text position
-            float textX = x + (w * 0.05f) + imageSize + (w * 0.04f);
-            float maxTextW = (x + w) - textX - (w * 0.06f);
-            float textOffset = h * 0.07f; // move content upward
-
-            using (var tp = new SKPaint { Color = SKColors.White, IsAntialias = true, FakeBoldText = true })
-            {
-                tp.TextSize = h * 0.13f;
-                string[] words = SplitNameStrict(p.Name, maxTextW, tp);
-
-                if (words.Length > 1)
-                {
-                    canvas.DrawText(words[0], textX, y + topPadding + (h * 0.30f) - textOffset, tp);
-                    canvas.DrawText(words[1], textX, y + topPadding + (h * 0.45f) - textOffset, tp);
-                }
-                else
-                    canvas.DrawText(p.Name, textX, y + topPadding + (h * 0.40f) - textOffset, tp);
-
-                tp.FakeBoldText = false;
-                tp.TextSize = h * 0.10f;
-                tp.Color = SKColors.Silver;
-                canvas.DrawText(p.Skill1, textX, y + topPadding + (h * 0.60f) - textOffset, tp);
-                canvas.DrawText(p.Skill2, textX, y + topPadding + (h * 0.72f) - textOffset, tp);
-
-                tp.Color = t.Accent;
-                tp.TextSize = h * 0.11f;
-                tp.FakeBoldText = true;
-                canvas.DrawText("PTS: " + p.Points + " | " + p.PlayerType, textX, y + topPadding + (h * 0.88f) - textOffset, tp);
-            }
-        }
-
-        static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showTeamLogo, bool showTournamentLogo, Theme t)
-        {
-            float margin = w * 0.03f;
-            float headerBaseY = h * 0.045f;
-            float centerX = w / 2;
-
-            float logoW = w * 0.15f;
-            float logoH = h * 0.07f;
-
-            SKRect left = DrawProportionalLogo(canvas, LogoCrickhunt, margin, headerBaseY - (logoH / 2), logoW, logoH, true, showTeamLogo);
-            SKRect right = DrawProportionalLogo(canvas, LogoTournament, w - margin, headerBaseY - (logoH / 2), logoW, logoH, false, showTournamentLogo);
-            
-            centerX = left.Right + (right.Left - left.Right) / 2;
-
-            using (var paint = new SKPaint { IsAntialias = true, TextAlign = SKTextAlign.Center })
-            {
-                // MAIN TITLE
-                paint.Color = SKColors.White;
-                paint.TextSize = h * 0.035f;
-                paint.FakeBoldText = true;
-                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.01f), paint);
-
-                // SUB TITLE
-                paint.Color = SKColors.Silver;
-                paint.TextSize = h * 0.017f;
-                paint.FakeBoldText = false;
-                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4", centerX, headerBaseY + (h * 0.028f), paint);
-            }
-
-            // DIVIDER POSITION (balanced spacing)
-            float divY = headerBaseY + (h * 0.038f);
-            float divHeight = h * 0.0025f;
-
-            using (var glassP = new SKPaint
-            {
-                Color = new SKColor(255, 255, 255, 30),
-                IsAntialias = true
-            })
-            {
-                canvas.DrawRect(new SKRect(margin, divY, w - margin, divY + divHeight), glassP);
-            }
-
-            using (var glowP = new SKPaint
-            {
-                Color = t.Accent.WithAlpha(180),
-                StrokeWidth = 2,
-                IsAntialias = true
-            })
-            {
-                canvas.DrawLine(
-                    margin,
-                    divY + (divHeight / 2),
-                    w - margin,
-                    divY + (divHeight / 2),
-                    glowP);
             }
         }
 
@@ -402,7 +452,7 @@ namespace CreateSquad
         {
             return new List<Theme> {
                 new Theme { Name = "Mumbai Blue", Primary = new SKColor(0, 75, 160), Secondary = new SKColor(210, 170, 0), Accent = new SKColor(255, 235, 59) },
-                new Theme { Name = "Chennai Gold", Primary = new SKColor(255, 200, 0), Secondary = new SKColor(0, 100, 180), Accent = SKColors.Yellow },
+                new Theme { Name = "Chennai Gold", Primary = new SKColor(235, 180, 0), Secondary = new SKColor(0, 100, 180), Accent = SKColors.Yellow},
                 new Theme { Name = "Bangalore Red", Primary = new SKColor(180, 0, 0), Secondary = new SKColor(40, 40, 40), Accent = new SKColor(255, 215, 0) },
                 new Theme { Name = "Classic Gold/Black", Primary = new SKColor(30, 30, 30), Secondary = new SKColor(212, 175, 55), Accent = new SKColor(255, 215, 0) },
                 new Theme { Name = "Kolkata Purple", Primary = new SKColor(60, 20, 100), Secondary = new SKColor(180, 150, 0), Accent = SKColors.White },
@@ -413,7 +463,7 @@ namespace CreateSquad
                 new Theme { Name = "Punjab Silver", Primary = new SKColor(200, 0, 0), Secondary = new SKColor(192, 192, 192), Accent = SKColors.White },
                 new Theme { Name = "Delhi Blue/Red", Primary = new SKColor(0, 80, 180), Secondary = new SKColor(200, 0, 0), Accent = SKColors.White },
                 new Theme { Name = "Neon Green", Primary = new SKColor(20, 60, 20), Secondary = new SKColor(50, 255, 50), Accent = SKColors.White },
-                new Theme { Name = "Electric Blue", Primary = new SKColor(10, 10, 80), Secondary = new SKColor(0, 255, 255), Accent = SKColors.White },
+                new Theme { Name = "Electric Blue", Primary = new SKColor(10, 10, 80), Secondary = new SKColor(20, 40, 140),  Accent = SKColors.White },
                 new Theme { Name = "Sunset Orange", Primary = new SKColor(100, 40, 0), Secondary = new SKColor(255, 165, 0), Accent = SKColors.Yellow },
                 new Theme { Name = "Midnight Purple", Primary = new SKColor(30, 0, 50), Secondary = new SKColor(200, 100, 255), Accent = SKColors.White },
                 new Theme { Name = "Forest Green", Primary = new SKColor(0, 50, 0), Secondary = new SKColor(150, 255, 150), Accent = SKColors.Yellow },
