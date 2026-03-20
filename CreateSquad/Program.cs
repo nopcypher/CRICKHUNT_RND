@@ -63,6 +63,10 @@ namespace CreateSquad
                     return SKColors.LightGray;
                 case "Chennai Gold":
                     return new SKColor(240, 240, 240);
+                case "Lucknow Cyan":
+                    return new SKColor(240, 240, 240);
+                case "Royal White":
+                    return new SKColor(240, 240, 240); 
 
                 default:
                     return new SKColor(210, 210, 210);
@@ -73,7 +77,7 @@ namespace CreateSquad
         {
             string safeName = t.Name.Replace(" ", "_").Replace("/", "-");
 
-            // Portrait 1080x1920
+            //// Portrait 1080x1920
             GenerateImage(players, 1080, 1920, Path.Combine(OutputFolder, safeName + "_Portrait_" + ts + ".png"), true, false, t);
 
             // Square 1500x1500
@@ -173,7 +177,8 @@ namespace CreateSquad
         static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showTeamLogo, bool showTournamentLogo, Theme t)
         {
             float margin = w * 0.03f;
-            float headerBaseY = h * 0.045f;
+            // REDUCED TOP GAP: Changed from 0.05f to 0.035f to move header up
+            float headerBaseY = h * 0.035f;
             float centerX = w / 2;
 
             float logoW = w * 0.15f;
@@ -186,18 +191,17 @@ namespace CreateSquad
 
             using (var paint = new SKPaint { IsAntialias = true, TextAlign = SKTextAlign.Center })
             {
-                // MAIN TITLE
+                // --- MAIN TITLE ---
                 paint.Color = SKColors.White;
-                paint.TextSize = h * 0.035f;
+                paint.TextSize = h * 0.028f;
                 paint.FakeBoldText = true;
-                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY + (h * 0.01f), paint);
+                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY, paint);
 
-                // SUB TITLE
+                // --- SUB TITLE ---
                 paint.TextSize = h * 0.017f;
                 paint.FakeBoldText = false;
-
-                // Slightly brighter silver (natural look)
                 paint.Color = SKColors.Silver;
+
 
                 switch (t.Name)
                 {
@@ -205,41 +209,34 @@ namespace CreateSquad
                         paint.Color = SKColors.LightGray;
                         break;
                     case "Chennai Gold":
-                        paint.Color = SKColors.Gray;
+                        paint.Color = new SKColor(80, 80, 80);
+                        break;
+                    case "Lucknow Cyan":
+                        paint.Color = new SKColor(80, 80, 80);
                         break;
                     case "Hyderabad Orange":
+                        paint.Color = new SKColor(60, 60, 60);
+                        break;
+                    case "Royal White":
                         paint.Color = new SKColor(60, 60, 60);
                         break;
                 }
                 canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4", centerX, headerBaseY + (h * 0.028f), paint);
             }
 
-            // DIVIDER POSITION (balanced spacing)
-            float divY = headerBaseY + (h * 0.038f);
+            // --- DIVIDER LINE ---
+            // Positioned slightly lower than subtitle
+            float divY = headerBaseY + (h * 0.042f);
             float divHeight = h * 0.0025f;
 
-            using (var glassP = new SKPaint
-            {
-                Color = new SKColor(255, 255, 255, 30),
-                IsAntialias = true
-            })
+            using (var glassP = new SKPaint { Color = new SKColor(255, 255, 255, 30), IsAntialias = true })
             {
                 canvas.DrawRect(new SKRect(margin, divY, w - margin, divY + divHeight), glassP);
             }
 
-            using (var glowP = new SKPaint
+            using (var glowP = new SKPaint { Color = t.Accent.WithAlpha(180), StrokeWidth = 2, IsAntialias = true })
             {
-                Color = t.Accent.WithAlpha(180),
-                StrokeWidth = 2,
-                IsAntialias = true
-            })
-            {
-                canvas.DrawLine(
-                    margin,
-                    divY + (divHeight / 2),
-                    w - margin,
-                    divY + (divHeight / 2),
-                    glowP);
+                canvas.DrawLine(margin, divY + (divHeight / 2), w - margin, divY + (divHeight / 2), glowP);
             }
         }
 
@@ -271,10 +268,13 @@ namespace CreateSquad
             switch (t.Name)
             {
                 case "Bangalore Red":
+                    badgeColor = new SKColor(170, 65, 65);
+                    break;
+                case "Punjab Silver":
                     badgeColor = new SKColor(80, 80, 80);
                     break;
                 case "Crimson Silver":
-                    badgeColor = new SKColor(130, 130, 130);
+                    badgeColor = new SKColor(120, 120, 120);
                     break;
                 case "Forest Green":
                     badgeColor = new SKColor(70, 170, 70);
@@ -284,6 +284,12 @@ namespace CreateSquad
                     break;
                 case "Electric Blue":
                     badgeColor = new SKColor(20, 40, 140);
+                    break;
+                case "Neon Green":
+                    badgeColor = new SKColor(60, 160, 60);
+                    break;
+                case "Ocean Teal":
+                    badgeColor = new SKColor(0, 170, 170);
                     break;
             }
 
@@ -311,9 +317,13 @@ namespace CreateSquad
             float maxTextW = (x + w) - textX - (w * 0.06f);
             float textOffset = h * 0.07f; // move content upward
 
-            using (var tp = new SKPaint { Color = SKColors.White, IsAntialias = true, FakeBoldText = true })
+            using (var tp = new SKPaint { Color = SKColors.White, IsAntialias = true })
             {
+                bool isRoyalWhite = t.Name == "Royal White";
+
+                tp.FakeBoldText = true; // keep names bold always
                 tp.TextSize = h * 0.13f;
+
                 string[] words = SplitNameStrict(p.Name, maxTextW, tp);
 
                 if (words.Length > 1)
@@ -324,15 +334,25 @@ namespace CreateSquad
                 else
                     canvas.DrawText(p.Name, textX, y + topPadding + (h * 0.40f) - textOffset, tp);
 
-                tp.FakeBoldText = false;
+                // 👉 For Royal White, keep everything bold
+                tp.FakeBoldText = isRoyalWhite;
+
                 tp.TextSize = h * 0.10f;
                 tp.Color = GetSkillColor(t);
                 canvas.DrawText(p.Skill1, textX, y + topPadding + (h * 0.60f) - textOffset, tp);
                 canvas.DrawText(p.Skill2, textX, y + topPadding + (h * 0.72f) - textOffset, tp);
 
+           
+
                 tp.Color = t.Accent;
                 tp.TextSize = h * 0.11f;
-                tp.FakeBoldText = true;
+                tp.FakeBoldText = true; // keep PTS always bold
+                switch (t.Name)
+                {
+                    case "Stealth Grey":
+                        tp.Color = new SKColor(225, 215, 49);
+                        break;
+                }
                 canvas.DrawText("PTS: " + p.Points + " | " + p.PlayerType, textX, y + topPadding + (h * 0.88f) - textOffset, tp);
             }
         }
@@ -454,12 +474,12 @@ namespace CreateSquad
                 new Theme { Name = "Mumbai Blue", Primary = new SKColor(0, 75, 160), Secondary = new SKColor(210, 170, 0), Accent = new SKColor(255, 235, 59) },
                 new Theme { Name = "Chennai Gold", Primary = new SKColor(235, 180, 0), Secondary = new SKColor(0, 100, 180), Accent = SKColors.Yellow},
                 new Theme { Name = "Bangalore Red", Primary = new SKColor(180, 0, 0), Secondary = new SKColor(40, 40, 40), Accent = new SKColor(255, 215, 0) },
-                new Theme { Name = "Classic Gold/Black", Primary = new SKColor(30, 30, 30), Secondary = new SKColor(212, 175, 55), Accent = new SKColor(255, 215, 0) },
+                new Theme { Name = "Classic Gold/Black", Primary = new SKColor(30, 30, 30), Secondary = new SKColor(160, 136, 52), Accent = new SKColor(255, 215, 0) },
                 new Theme { Name = "Kolkata Purple", Primary = new SKColor(60, 20, 100), Secondary = new SKColor(180, 150, 0), Accent = SKColors.White },
                 new Theme { Name = "Gujarat Pink/Blue", Primary = new SKColor(20, 50, 100), Secondary = new SKColor(230, 0, 120), Accent = SKColors.Cyan },
                 new Theme { Name = "Rajasthan Pink", Primary = new SKColor(230, 0, 120), Secondary = new SKColor(0, 50, 120), Accent = SKColors.Yellow },
                 new Theme { Name = "Hyderabad Orange", Primary = new SKColor(255, 100, 0), Secondary = new SKColor(40, 40, 40), Accent = SKColors.White },
-                new Theme { Name = "Lucknow Cyan", Primary = new SKColor(0, 150, 180), Secondary = new SKColor(255, 120, 0), Accent = SKColors.White },
+                new Theme { Name = "Lucknow Cyan", Primary = new SKColor(0, 150, 180), Secondary = new SKColor(245, 110, 0), Accent = SKColors.White },
                 new Theme { Name = "Punjab Silver", Primary = new SKColor(200, 0, 0), Secondary = new SKColor(192, 192, 192), Accent = SKColors.White },
                 new Theme { Name = "Delhi Blue/Red", Primary = new SKColor(0, 80, 180), Secondary = new SKColor(200, 0, 0), Accent = SKColors.White },
                 new Theme { Name = "Neon Green", Primary = new SKColor(20, 60, 20), Secondary = new SKColor(50, 255, 50), Accent = SKColors.White },
@@ -469,8 +489,8 @@ namespace CreateSquad
                 new Theme { Name = "Forest Green", Primary = new SKColor(0, 50, 0), Secondary = new SKColor(150, 255, 150), Accent = SKColors.Yellow },
                 new Theme { Name = "Crimson Silver", Primary = new SKColor(120, 0, 20), Secondary = new SKColor(160, 160, 160), Accent = SKColors.White },
                 new Theme { Name = "Ocean Teal", Primary = new SKColor(0, 60, 60), Secondary = new SKColor(0, 200, 200), Accent = SKColors.Yellow },
-                new Theme { Name = "Royal White", Primary = new SKColor(240, 240, 240), Secondary = new SKColor(180, 140, 0), Accent = new SKColor(40, 40, 40) },
-                new Theme { Name = "Stealth Grey", Primary = new SKColor(50, 50, 50), Secondary = new SKColor(100, 100, 100), Accent = SKColors.Red }
+                new Theme { Name = "Royal White", Primary = new SKColor(210, 210, 210), Secondary = new SKColor(180, 140, 0), Accent = new SKColor(255, 235, 59) },
+                new Theme { Name = "Stealth Grey", Primary = new SKColor(50, 50, 50), Secondary = new SKColor(100, 100, 100), Accent = new SKColor(225, 215, 49) }
             };
         }
 
