@@ -77,7 +77,7 @@ namespace CreateSquad
         {
             string safeName = t.Name.Replace(" ", "_").Replace("/", "-");
 
-            //// Portrait 1080x1920
+            // Portrait 1080x1920
             GenerateImage(players, 1080, 1920, Path.Combine(OutputFolder, safeName + "_Portrait_" + ts + ".png"), true, false, t);
 
             // Square 1500x1500
@@ -89,9 +89,10 @@ namespace CreateSquad
             using (var surface = SKSurface.Create(new SKImageInfo(w, h)))
             {
                 var canvas = surface.Canvas;
+                bool isPortrait = h > w;
 
                 DrawComplexBroadcastBackground(canvas, w, h, theme);
-                DrawProfessionalHeader(canvas, w, h, showTeamLogo, showTournamentLogo, theme);
+                DrawProfessionalHeader(canvas, w, h, showTeamLogo, showTournamentLogo, theme, isPortrait);
 
                 float pad = w * 0.01f;
                 float startY = h * 0.085f;
@@ -174,72 +175,94 @@ namespace CreateSquad
             }
         }
 
-        static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showTeamLogo, bool showTournamentLogo, Theme t)
+        static void DrawProfessionalHeader(SKCanvas canvas, float w, float h, bool showTeamLogo, bool showTournamentLogo, Theme t, bool isPortrait)
         {
             float margin = w * 0.03f;
-            // REDUCED TOP GAP: Changed from 0.05f to 0.035f to move header up
+
+            // Slightly higher header
             float headerBaseY = h * 0.035f;
-            float centerX = w / 2;
 
             float logoW = w * 0.15f;
             float logoH = h * 0.07f;
 
+            // --- DRAW LOGOS ---
             SKRect left = DrawProportionalLogo(canvas, LogoCrickhunt, margin, headerBaseY - (logoH / 2), logoW, logoH, true, showTeamLogo);
             SKRect right = DrawProportionalLogo(canvas, LogoTournament, w - margin, headerBaseY - (logoH / 2), logoW, logoH, false, showTournamentLogo);
 
-            centerX = left.Right + (right.Left - left.Right) / 2;
+            // --- TEXT POSITION LOGIC ---
+            float textStartX;
+            SKTextAlign align;
 
-            using (var paint = new SKPaint { IsAntialias = true, TextAlign = SKTextAlign.Center })
+            if (isPortrait)
+            {
+                // Start text after left logo
+                textStartX = left.Right + (w * 0.025f);
+                align = SKTextAlign.Left;
+            }
+            else
+            {
+                // Center text between logos
+                textStartX = left.Right + (right.Left - left.Right) / 2;
+                align = SKTextAlign.Center;
+            }
+
+            using (var paint = new SKPaint { IsAntialias = true, TextAlign = align })
             {
                 // --- MAIN TITLE ---
                 paint.Color = SKColors.White;
                 paint.TextSize = h * 0.028f;
                 paint.FakeBoldText = true;
-                canvas.DrawText("RISING STAR MEDHA", centerX, headerBaseY, paint);
+
+                canvas.DrawText("RISING STAR MEDHA", textStartX, headerBaseY, paint);
 
                 // --- SUB TITLE ---
                 paint.TextSize = h * 0.017f;
                 paint.FakeBoldText = false;
                 paint.Color = SKColors.Silver;
 
-
                 switch (t.Name)
                 {
                     case "Bangalore Red":
                         paint.Color = SKColors.LightGray;
                         break;
+
                     case "Chennai Gold":
-                        paint.Color = new SKColor(80, 80, 80);
-                        break;
                     case "Lucknow Cyan":
                         paint.Color = new SKColor(80, 80, 80);
                         break;
+
                     case "Hyderabad Orange":
-                        paint.Color = new SKColor(60, 60, 60);
-                        break;
                     case "Royal White":
                         paint.Color = new SKColor(60, 60, 60);
                         break;
                 }
-                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4", centerX, headerBaseY + (h * 0.028f), paint);
+
+                canvas.DrawText("BOTAD TALUKA PREMIER LEAGUE - SEASON 4", textStartX, headerBaseY + (h * 0.028f), paint);
             }
 
             // --- DIVIDER LINE ---
-            // Positioned slightly lower than subtitle
             float divY = headerBaseY + (h * 0.042f);
             float divHeight = h * 0.0025f;
 
-            using (var glassP = new SKPaint { Color = new SKColor(255, 255, 255, 30), IsAntialias = true })
+            using (var glassP = new SKPaint
+            {
+                Color = new SKColor(255, 255, 255, 30),
+                IsAntialias = true
+            })
             {
                 canvas.DrawRect(new SKRect(margin, divY, w - margin, divY + divHeight), glassP);
             }
 
-            using (var glowP = new SKPaint { Color = t.Accent.WithAlpha(180), StrokeWidth = 2, IsAntialias = true })
+            using (var glowP = new SKPaint
+            {
+                Color = t.Accent.WithAlpha(180),
+                StrokeWidth = 2,
+                IsAntialias = true
+            })
             {
                 canvas.DrawLine(margin, divY + (divHeight / 2), w - margin, divY + (divHeight / 2), glowP);
             }
         }
-
         static void DrawGlassPlayerCard(SKCanvas canvas, Player p, float x, float y, float w, float h, Theme t, float imageScale = 0.75f)
         {
             float topPadding = h * 0.05f; // 5% of height as top spacing
@@ -350,7 +373,7 @@ namespace CreateSquad
                 switch (t.Name)
                 {
                     case "Stealth Grey":
-                        tp.Color = new SKColor(225, 215, 49);
+                        tp.Color = new SKColor(60, 160, 60);
                         break;
                 }
                 canvas.DrawText("PTS: " + p.Points + " | " + p.PlayerType, textX, y + topPadding + (h * 0.88f) - textOffset, tp);
@@ -490,7 +513,7 @@ namespace CreateSquad
                 new Theme { Name = "Crimson Silver", Primary = new SKColor(120, 0, 20), Secondary = new SKColor(160, 160, 160), Accent = SKColors.White },
                 new Theme { Name = "Ocean Teal", Primary = new SKColor(0, 60, 60), Secondary = new SKColor(0, 200, 200), Accent = SKColors.Yellow },
                 new Theme { Name = "Royal White", Primary = new SKColor(210, 210, 210), Secondary = new SKColor(180, 140, 0), Accent = new SKColor(255, 235, 59) },
-                new Theme { Name = "Stealth Grey", Primary = new SKColor(50, 50, 50), Secondary = new SKColor(100, 100, 100), Accent = new SKColor(225, 215, 49) }
+                new Theme { Name = "Stealth Grey", Primary = new SKColor(50, 50, 50), Secondary = new SKColor(100, 100, 100), Accent = new SKColor(60, 160, 60) }
             };
         }
 
